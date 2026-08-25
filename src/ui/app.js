@@ -94,6 +94,28 @@ function fmtValidade(dateStr){ if(!dateStr) return null; return new Date(dateStr
 function fmtDateTime(iso){ const d=new Date(iso); return d.toLocaleDateString('pt-BR')+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
 function fmtNum(n){ const v=Number(n); return (Math.round(v*100)/100).toLocaleString('pt-BR'); }
 function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* "Lembrar" fazenda/usuário neste aparelho — preferência só local do navegador, nunca sincronizada. */
+function getLembrarFazenda(){
+  try{ return localStorage.getItem('farmstock_lembrar_fazenda_codigo') || ''; }catch(e){ return ''; }
+}
+function setLembrarFazenda(codigo){
+  try{
+    if(codigo) localStorage.setItem('farmstock_lembrar_fazenda_codigo', codigo);
+    else localStorage.removeItem('farmstock_lembrar_fazenda_codigo');
+  }catch(e){}
+}
+function getLembrarUsuario(fazendaId){
+  if(!fazendaId) return '';
+  try{ return localStorage.getItem('farmstock_lembrar_usuario_'+fazendaId) || ''; }catch(e){ return ''; }
+}
+function setLembrarUsuario(fazendaId, nome){
+  if(!fazendaId) return;
+  try{
+    if(nome) localStorage.setItem('farmstock_lembrar_usuario_'+fazendaId, nome);
+    else localStorage.removeItem('farmstock_lembrar_usuario_'+fazendaId);
+  }catch(e){}
+}
 function showToast(msg){
   clearTimeout(State.toastTimer);
   let t = document.getElementById('toast');
@@ -286,7 +308,10 @@ function renderLogin(){
       <div class="login-hero"><img class="cross-big" src="/icons/icon-192.png" alt="Farm Stock"><h1>Farm Stock</h1><p>Controle de estoque de medicamentos e insumos</p></div>
       <div class="card">
         <h3 style="margin-top:0;font-size:15px;">Entrar na fazenda</h3>
-        <div class="field"><label>Código da fazenda</label><input id="fzCodigo" placeholder="Ex.: SANTARITA" class="mono"></div>
+        <div class="field"><label>Código da fazenda</label><input id="fzCodigo" placeholder="Ex.: SANTARITA" class="mono" value="${escapeHtml(getLembrarFazenda()||'')}"></div>
+        <label style="display:flex;align-items:center;gap:8px;margin:-6px 0 14px;font-size:12.5px;color:var(--ink-soft);">
+          <input type="checkbox" id="fzLembrar" ${getLembrarFazenda()?'checked':''}> Lembrar código da fazenda neste aparelho
+        </label>
         <button type="button" class="btn btn-primary" id="fzEntrarBtn">Entrar</button>
       </div>
       <div style="margin-top:16px;text-align:center;"><button class="btn btn-ghost" id="fzNovaBtn">+ Cadastrar nova fazenda</button></div>
@@ -338,7 +363,10 @@ function renderLogin(){
     ` : `
       <div class="card">
         <h3 style="margin-top:0;font-size:15px;">Quem está usando o sistema?</h3>
-        <div class="field"><label>Seu nome</label><input id="loginNomeInput" placeholder="Digite seu nome" autocomplete="off"></div>
+        <div class="field"><label>Seu nome</label><input id="loginNomeInput" placeholder="Digite seu nome" autocomplete="off" value="${escapeHtml(getLembrarUsuario(State.loginFazendaId)||'')}"></div>
+        <label style="display:flex;align-items:center;gap:8px;margin:-6px 0 14px;font-size:12.5px;color:var(--ink-soft);">
+          <input type="checkbox" id="loginNomeLembrar" ${getLembrarUsuario(State.loginFazendaId)?'checked':''}> Lembrar meu nome neste aparelho
+        </label>
         <div id="loginNomeErr"></div>
         <button type="button" class="btn btn-primary" id="loginNomeBtn">Continuar</button>
       </div>
@@ -379,6 +407,8 @@ function attachLoginEvents(){
     if(!codigo){ showToast('Informe o código da fazenda.'); return; }
     const fazenda = State.fazendas.find(f=>f.codigo.toLowerCase()===codigo.toLowerCase());
     if(!fazenda){ showToast('Código de fazenda não encontrado.'); return; }
+    const lembrarEl = document.getElementById('fzLembrar');
+    setLembrarFazenda(lembrarEl && lembrarEl.checked ? fazenda.codigo : null);
     State.loginFazendaId = fazenda.id; render();
   };
   const fzNovaBtn = document.getElementById('fzNovaBtn');
@@ -410,6 +440,8 @@ function attachLoginEvents(){
     const usuariosFazenda = State.usuarios.filter(u=>u.fazendaId===State.loginFazendaId && u.ativo!==false);
     const encontrado = usuariosFazenda.find(u=>u.nome.toLowerCase()===nome.toLowerCase());
     if(!encontrado){ errBox.innerHTML = `<div class="scan-error">Nome não encontrado nesta fazenda. Confira a digitação ou peça a um Gestor para cadastrar seu acesso.</div>`; return; }
+    const lembrarEl = document.getElementById('loginNomeLembrar');
+    setLembrarUsuario(State.loginFazendaId, lembrarEl && lembrarEl.checked ? encontrado.nome : null);
     State.pinTargetUser = encontrado; State.pinBuffer=''; State.pinError=false; render();
   };
   if(loginNomeBtn) loginNomeBtn.onclick = buscarUsuario;
